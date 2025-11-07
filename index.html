@@ -1,83 +1,155 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock EMM</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
-        h1 { text-align: center; color: #333; }
-        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
-        button { padding: 5px 10px; margin: 2px; border: none; border-radius: 5px; cursor: pointer; }
-        .add { background-color: #4CAF50; color: white; }
-        .remove { background-color: #f44336; color: white; }
-        input { padding: 5px; width: 70%; }
-        .add-product { margin-bottom: 20px; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Stock EMM</title>
+  <style>
+    body{font-family:system-ui,Arial,sans-serif;background:#f6f7f9;margin:0}
+    .wrap{max-width:960px;margin:20px auto;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:16px}
+    h1{margin:0 0 12px}
+    .card{border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:10px 0}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .row>*{flex:1 1 160px}
+    input,select,button{padding:10px;border:1px solid #d1d5db;border-radius:8px}
+    button{cursor:pointer}
+    .ok{color:#065f46}.err{color:#991b1b}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:10px;border-bottom:1px solid #f1f5f9;text-align:left}
+    .qty-low{color:#b91c1c;font-weight:700}
+    .actions{display:flex;gap:6px;align-items:center}
+    .pill{padding:6px 10px;border-radius:8px;border:1px solid #d1d5db;background:#f8fafc}
+    .btn{border:none;padding:8px 10px;border-radius:8px}
+    .plus{background:#16a34a;color:#fff}
+    .minus{background:#dc2626;color:#fff}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📦 Stock EMM</h1>
-        <div class="add-product">
-            <input type="text" id="productName" placeholder="Nom du produit">
-            <input type="number" id="productQuantity" placeholder="Quantité initiale">
-            <button class="add" onclick="addProduct()">Ajouter le produit</button>
-        </div>
-        <table id="stockTable">
-            <thead>
-                <tr>
-                    <th>Produit</th>
-                    <th>Quantité</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+<div class="wrap">
+  <h1>📦 Stock EMM</h1>
+
+  <div class="card">
+    <h3>Ajouter un produit</h3>
+    <div class="row">
+      <input id="p_name" placeholder="Nom (ex: Masque ResMed N20)">
+      <input id="p_ref" placeholder="Référence (optionnel)">
+      <input id="p_alert" type="number" placeholder="Seuil alerte (ex: 3)">
+      <input id="p_init" type="number" placeholder="Quantité initiale (ex: 10)">
+      <button class="btn plus" onclick="createProduct()">Ajouter</button>
     </div>
+    <div id="msgAdd" class="ok"></div>
+  </div>
 
-    <script>
-        const API = ''; // (optionnel pour la version en ligne plus tard)
+  <div class="card">
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <h3 style="margin:0">État du stock</h3>
+      <button class="btn pill" onclick="loadAll()">Rafraîchir</button>
+    </div>
+    <table>
+      <thead><tr><th>Produit</th><th>Référence</th><th>Quantité</th><th>Seuil</th><th>Actions</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
 
-        const products = {};
+  <div class="card">
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Historique</h3>
+      <button class="btn pill" onclick="loadMoves()">Rafraîchir</button>
+    </div>
+    <div id="moves"></div>
+  </div>
+</div>
 
-        function addProduct() {
-            const name = document.getElementById('productName').value.trim();
-            const qty = parseInt(document.getElementById('productQuantity').value);
-            if (!name || isNaN(qty) || qty < 0) {
-                alert("Veuillez entrer un nom de produit et une quantité valide.");
-                return;
-            }
-            products[name] = (products[name] || 0) + qty;
-            document.getElementById('productName').value = '';
-            document.getElementById('productQuantity').value = '';
-            updateTable();
-        }
+<script>
+const API = ""; // même origine
 
-        function changeQuantity(name, delta) {
-            products[name] = (products[name] || 0) + delta;
-            if (products[name] < 0) products[name] = 0; // empêche stock négatif
-            updateTable();
-        }
+async function api(path, options={}){
+  const res = await fetch(path.startsWith('/api')? path : '/api'+path, {
+    headers: {'Content-Type':'application/json'},
+    ...options
+  });
+  if(!res.ok){
+    const t = await res.text(); throw new Error(t || res.statusText);
+  }
+  return res.json();
+}
 
-        function updateTable() {
-            const tbody = document.querySelector('#stockTable tbody');
-            tbody.innerHTML = '';
-            for (const [name, qty] of Object.entries(products)) {
-                const row = `
-                    <tr>
-                        <td>${name}</td>
-                        <td>${qty}</td>
-                        <td>
-                            <button class="add" onclick="changeQuantity('${name}', 1)">+</button>
-                            <button class="remove" onclick="changeQuantity('${name}', -1)">-</button>
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            }
-        }
-    </script>
+// Produits
+async function createProduct(){
+  const name = val('p_name'), reference = val('p_ref'), alert_threshold = num('p_alert', 1), initQty = num('p_init', 0);
+  if(!name){ return show('msgAdd', "Nom requis", true); }
+  await api('/products', {method:'POST', body: JSON.stringify({name, reference: reference || null, alert_threshold})});
+  show('msgAdd', "Produit ajouté ✅");
+  // si quantité initiale > 0, on enregistre une entrée
+  await ensureProducts(); // récupère la liste pour trouver l'id du produit créé
+  const prod = products.find(p => (p.name===name && (p.reference||'')===(reference||'')));
+  if(prod && initQty>0){ await move(prod.id, initQty, "Stock initial"); }
+  set('p_name',''); set('p_ref',''); set('p_alert',''); set('p_init','');
+  await loadAll();
+}
+
+async function move(product_id, delta, related_to){
+  return api('/movements', {method:'POST', body: JSON.stringify({product_id, delta, related_to: related_to||null})});
+}
+
+let products = [];
+async function ensureProducts(){
+  products = await api('/products');
+  return products;
+}
+
+async function loadStock(){
+  const arr = await api('/stock');
+  const tbody = document.getElementById('tbody'); tbody.innerHTML = '';
+  arr.forEach(p=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.name}</td>
+      <td>${p.reference||''}</td>
+      <td class="${p.quantity<=p.alert_threshold?'qty-low':''}">${p.quantity}</td>
+      <td>${p.alert_threshold??''}</td>
+      <td class="actions">
+        <button class="btn plus" onclick="quickDelta(${p.product_id}, 1)">+1</button>
+        <button class="btn minus" onclick="quickDelta(${p.product_id}, -1)">-1</button>
+        <input class="pill" id="amt_${p.product_id}" type="number" placeholder="Qté">
+        <button class="btn plus" onclick="customDelta(${p.product_id})">Appliquer</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadMoves(){
+  const arr = await api('/movements');
+  const root = document.getElementById('moves');
+  root.innerHTML = '<table style="width:100%"><thead><tr><th>Date</th><th>ProduitID</th><th>Δ</th><th>Raison</th></tr></thead><tbody>' +
+    arr.slice(0,100).map(m=>`<tr><td>${new Date(m.timestamp).toLocaleString()}</td><td>${m.product_id}</td><td>${m.delta}</td><td>${m.related_to||''}</td></tr>`).join('') +
+    '</tbody></table>';
+}
+
+async function quickDelta(id, d){
+  try{ await move(id, d, d>0? 'ajout rapide' : 'retrait rapide'); await loadAll(); }
+  catch(e){ alert(cleanErr(e.message)); }
+}
+
+async function customDelta(id){
+  const v = parseInt(document.getElementById('amt_'+id).value||'0');
+  if(!v){ return; }
+  try{ await move(id, v, 'ajout manuel'); await loadAll(); }
+  catch(e1){
+    try{ await move(id, -Math.abs(v), 'retrait manuel'); await loadAll(); }
+    catch(e2){ alert(cleanErr(e2.message)); }
+  }
+}
+
+function cleanErr(s){ return s.replace(/\\"/g,'"'); }
+function val(id){ return document.getElementById(id).value.trim(); }
+function set(id,v){ document.getElementById(id).value = v; }
+function num(id, def){ const x = parseInt(document.getElementById(id).value||''); return isNaN(x)? def : x; }
+
+async function loadAll(){ await ensureProducts(); await loadStock(); await loadMoves(); }
+loadAll();
+setInterval(loadStock, 15000);
+</script>
 </body>
 </html>
