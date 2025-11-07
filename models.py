@@ -13,10 +13,11 @@ class Product(SQLModel, table=True):
 class Movement(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     product_id: int = Field(foreign_key="product.id")
-    delta: int
+    delta: int  # + entrée, - sortie
     related_to: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
+# Schémas d'entrée API
 class MovementIn(SQLModel):
     product_id: int
     delta: int
@@ -26,3 +27,4 @@ class ProductIn(SQLModel):
     name: str
     reference: Optional[str] = None
     alert_threshold: Optional[int] = 1
+
