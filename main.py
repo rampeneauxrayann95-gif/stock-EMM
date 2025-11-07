@@ -10,6 +10,7 @@ from models import Product, Movement, MovementIn, ProductIn
 
 app = FastAPI(title="Stock EMM", version="1.0.0")
 
+
 .add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
