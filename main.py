@@ -8,16 +8,14 @@ from models import Product, Movement, MovementIn, ProductIn
 
 app = FastAPI(title="Stock EMM", version="1.0.0")
 
-
-
-.add_middleware(
+# Autoriser les accès depuis n'importe où (utile pour les techniciens)
+app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.on_event("startup")
 def startup():
