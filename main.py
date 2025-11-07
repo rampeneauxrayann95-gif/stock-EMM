@@ -6,9 +6,8 @@ from sqlmodel import select
 from database import init_db, get_session
 from models import Product, Movement, MovementIn, ProductIn
 
-
-
 app = FastAPI(title="Stock EMM", version="1.0.0")
+
 
 
 .add_middleware(
