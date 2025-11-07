@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Stock EMM</title>
+  <style>
+    body{font-family:system-ui,Arial,sans-serif;max-width:960px;margin:16px auto;padding:0 8px}
+    h1{font-size:24px;margin:0 0 12px}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px}
+    .card{border:1px solid #e5e7eb;border-radius:12px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    input,select,button{padding:10px;margin:4px 0;border:1px solid #d1d5db;border-radius:8px;font-size:14px}
+    button{cursor:pointer}
+    table{border-collapse:collapse;width:100%}
+    th,td{border-bottom:1px solid #f1f5f9;padding:8px;text-align:left}
+    .low{color:#b91c1c;font-weight:700}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .row > *{flex:1 1 160px}
+    .muted{color:#6b7280;font-size:12px}
+  </style>
+</head>
+<body>
+  <h1>Stock EMM</h1>
+  <div class="grid">
+    <div class="card">
+      <h3>Ajouter un produit</h3>
+      <div class="row">
+        <input id="p_name" placeholder="Nom (ex: Masque ResMed N20)">
+        <input id="p_ref" placeholder="Référence (optionnel)">
+        <input id="p_alert" type="number" placeholder="Seuil alerte (ex: 3)">
+        <button onclick="createProduct()">Ajouter</button>
+      </div>
+      <div class="muted">Ajoute d'abord les produits (masques, tuyaux), puis utilise Entrée/Sortie.</div>
+    </div>
+
+    <div class="card">
+      <h3>Entrée / Sortie</h3>
+      <div class="row">
+        <select id="sel_prod"></select>
+        <input id="m_qty" type="number" placeholder="+5 (entrée) ou -2 (sortie)">
+        <input id="m_dest" placeholder="Patient / raison (optionnel)">
+        <button onclick="createMovement()">Valider</button>
+      </div>
+      <div id="msg" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <h3 style="margin:0">État du stock</h3>
+        <button onclick="loadStock()">Rafraîchir</button>
+      </div>
+      <table id="stock_table">
+        <thead><tr><th>Produit</th><th>Référence</th><th>Qté</th><th>Seuil</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <h3 style="margin:0">Historique</h3>
+        <button onclick="loadMovements()">Rafraîchir</button>
+      </div>
+      <div id="moves"></div>
+    </div>
+  </div>
+
+<script>
+async function api(path, options={}){
+  const res = await fetch(path.startsWith('/api')? path : '/api'+path, {
+    headers: {'Content-Type':'application/json'},
+    ...options
+  });
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error(t || res.statusText);
+  }
+  return res.json();
+}
+
+async function createProduct(){
+  const name = document.getElementById('p_name').value.trim();
+  if(!name){ alert('Nom requis'); return; }
+  const reference = document.getElementById('p_ref').value.trim();
+  const alert_threshold = parseInt(document.getElementById('p_alert').value || '1');
+  await api('/products', {method:'POST', body: JSON.stringify({name, reference: reference || null, alert_threshold})});
+  document.getElementById('p_name').value=''; document.getElementById('p_ref').value=''; document.getElementById('p_alert').value='';
+  await loadProducts(); await loadStock();
+}
+
+async function loadProducts(){
+  const arr = await api('/products');
+  const sel = document.getElementById('sel_prod');
+  sel.innerHTML='';
+  arr.forEach(p=>{
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name + (p.reference? ' — ' + p.reference : '');
+    sel.appendChild(opt);
+  });
+  return arr;
+}
+
+async function createMovement(){
+  const pid = parseInt(document.getElementById('sel_prod').value);
+  const qty = parseInt(document.getElementById('m_qty').value||'0');
+  const dest = document.getElementById('m_dest').value.trim();
+  const msg = document.getElementById('msg');
+  msg.textContent = '';
+  try{
+    await api('/movements', {method:'POST', body: JSON.stringify({product_id: pid, delta: qty, related_to: dest || null})});
+    document.getElementById('m_qty').value=''; document.getElementById('m_dest').value='';
+    await loadStock(); await loadMovements();
+  }catch(e){
+    msg.textContent = 'Erreur: ' + e.message.replace(/\\"/g,'"');
+  }
+}
+
+async function loadStock(){
+  const arr = await api('/stock');
+  const tbody = document.querySelector('#stock_table tbody');
+  tbody.innerHTML='';
+  arr.forEach(p=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${p.name}</td><td>${p.reference||''}</td><td class="${p.quantity<=p.alert_threshold?'low':''}">${p.quantity}</td><td>${p.alert_threshold??''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadMovements(){
+  const arr = await api('/movements');
+  const root = document.getElementById('moves');
+  root.innerHTML = '<table style="width:100%"><thead><tr><th>Date</th><th>ProduitID</th><th>Δ</th><th>Raison</th></tr></thead><tbody>' +
+    arr.slice(0,100).map(m=>`<tr><td>${new Date(m.timestamp).toLocaleString()}</td><td>${m.product_id}</td><td>${m.delta}</td><td>${m.related_to||''}</td></tr>`).join('') +
+    '</tbody></table>';
+}
+
+loadProducts().then(()=>{ loadStock(); loadMovements(); });
+setInterval(loadStock, 15000);
+</script>
+</body>
+</html>
