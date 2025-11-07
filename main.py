@@ -7,7 +7,7 @@ from database import init_db, get_session
 from models import Product, Movement, MovementIn, ProductIn
 
 
- = FastAPI(title="Stock EMM", version="1.0.0")
+ = app = FastAPI(title="Stock EMM", version="1.0.0")
 
 .add_middleware(
     CORSMiddleware,
