@@ -23,7 +23,7 @@ def startup():
 
 @app.get("/", response_class=HTMLResponse)
 def index_page():
-    with open("static/index.html", "r", encoding="utf-8") as f:
+    with open("index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.post("/api/products", response_model=Product)
