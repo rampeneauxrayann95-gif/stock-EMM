@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import select
-from app.database import init_db, get_session
-from app.models import Product, Movement, MovementIn, ProductIn
+from database import init_db, get_session
+from models import Product, Movement, MovementIn, ProductIn
+
 
 app = FastAPI(title="Stock EMM", version="1.0.0")
 
